@@ -1,0 +1,9 @@
+LINE:
+.sprite #FF #FF #FF
+
+MAIN:
+LD I $LINE
+LD V0 #0
+LD V1 #15
+DRW V0 V1 #3
+JP $MAIN
