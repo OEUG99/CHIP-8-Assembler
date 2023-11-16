@@ -7,28 +7,36 @@ class Token:
     def __init__(self, type, value):
         self.type = type
         self.value = value
+        self.__check_validity()
 
     def __check_validity(self):
         if self.type == "hex":
             # check it is a valid hex number and not over 8 bits:
             if int(self.value, 16) > 0xFFF:
                 raise ValueError("Hex number is too large for 16 bit system")
+            else:
+                self.value = int(self.value, 16)  # convert hex string to int
 
     def __repr__(self):
-        return f"Token({self.type}, {self.value})"
+        return f"Token({repr(self.type)}, {repr(self.value)})"
+
 
 
 class TokenSequence:
 
-    def __init__(self, tokens=None):
-        if tokens is None:
-            tokens = []
-        self.tokens = tokens
+    def __init__(self, obj=None):
+        if obj is None:
+            obj = []
+        self.tokens = obj
 
     def enqueue(self, token: Token):
         self.tokens.append(token)
 
     def dequeue(self, __index=0):
+
+        if len(self.tokens) == 0:
+            return None
+
         return self.pop(__index)
 
     def pop(self, __index=-1):
@@ -38,7 +46,21 @@ class TokenSequence:
         return len(self.tokens)
 
     def __repr__(self):
-        return f"TokenSequence({self.tokens})"
+        return f"TokenSequence({repr(self.tokens)})"
+
+    def __next__(self):
+        result = self.dequeue()
+
+        if len(self.tokens) == 0:
+            raise Exception()
+
+        return result
+
+    def __iter__(self):
+        return self
+
+
+
 
 
 opcode_Mnemonic = {
@@ -68,51 +90,45 @@ derective_Mnemonic = {
     "DB",
 }
 
-arithmetic_operators = {
-    "+",
-    "-",
-    "=",
-    "*",
-    "/",
-    ">",
-    "<",
-    "(",
-    ")",
+operators = {
+    "arithmetic": {
+        "+",
+        "-",
+        "*",
+        "/",
+        "%",
+    },
+
+    "assignment": {
+        "=",
+    },
+
+    "relational": {
+        "==",
+        "!=",
+        ">",
+        "<",
+        ">=",
+        "<=",
+    },
+    "logical": {
+        "&&",
+        "||",
+        "!",
+        "AND",
+        "OR",
+        "NOT",
+    }
 }
 
-relational_operators = {
-    ">",
-    "<",
-    "==",
-    ">=",
-    "<=",
-    "!=",
-}
-
-logcal_operators = {
-    "&&",
-    "||",
-    "!",
-}
-
-assignment_operators = {
-    "=",
-    "+=",
-    "-=",
-    "*=",
-    "/=",
-    "%=",
-    "&=",
-    "|=",
-    "^=",
-    "<<=",
-    ">>=",
+kewords = {
+    "IF",
+    "ELSE",
+    "WHILE",
 }
 
 
-
-
-class lexer:
+class Lexer:
 
     def __init__(self):
         pass
@@ -129,17 +145,26 @@ class lexer:
 
         token_sequence = TokenSequence()
 
-        lexemes = re.findall(r"([a-zA-Z0-9_:&]+|[+\-*/=><\(\)])", string)
-        print(lexemes)
+        lexemes = re.findall(r"([a-zA-Z0-9_:&]+|[+\-*/=><\(\)\n;])", string)
+
         for lexeme in lexemes:
 
+            # determine if lexeme is a new line
+            if lexeme == ";":
+                token_sequence.enqueue(Token("EOL", lexeme))
+                continue
+
             # Determine if lexeme is a math operator
-            if lexeme in arithmetic_operators:
-                token_sequence.enqueue(Token("operator", lexeme))
+            if lexeme in operators["arithmetic"]:
+                token_sequence.enqueue(Token("arithmetic_operator", lexeme))
+                continue
+
+            # Determine if lexeme is an assignment operator:
+            elif lexeme in operators["assignment"]:
+                token_sequence.enqueue(Token("assignment_operator", lexeme))
                 continue
 
             # if lexeme is a directive
-
             if lexeme in derective_Mnemonic:
                 token_sequence.enqueue(Token("directive", lexeme))
                 continue
@@ -202,7 +227,7 @@ class lexer:
             # Determine if lexeme is a hex number
             hex_number_match = re.match(r"0x([0-9aA-ff]*)", lexeme)
             if hex_number_match is not None:
-                token_sequence.enqueue(Token("hex", hex_number_match.group()))
+                token_sequence.enqueue(Token("number", hex_number_match.group()))
                 continue
 
             # Determine if lexeme is a decimal number
@@ -210,7 +235,7 @@ class lexer:
             if decimal_number_match is not None:
                 # Convert decimal number to hex
                 hex_number = hex(int(decimal_number_match.group()))
-                token_sequence.enqueue(Token("hex", hex_number))
+                token_sequence.enqueue(Token("number", hex_number))
                 continue
 
             # determine if lexeme is a label reference
@@ -231,7 +256,7 @@ class lexer:
 
         return token_sequence
 
-    def analyze_file(self, file_path: str) -> list[TokenSequence]:
+    def analyze_file(self, file_path: str):
         """
         Analyzes a file and returns a list of token sequences
         :param file_path:
@@ -247,13 +272,11 @@ class lexer:
             with open(file_path, "r") as file:
                 contents = file.read()
 
-            lines = contents.splitlines()
+                lines = contents.splitlines()
 
-
-
-            for line in lines:
-                token_sequence = self.analyze_string(line)
-                if token_sequence is not None:
-                    result.append(token_sequence)
+                for line in lines:
+                    token_sequence = self.analyze_string(line)
+                    if token_sequence is not None:
+                        result.append(token_sequence)
 
             return result

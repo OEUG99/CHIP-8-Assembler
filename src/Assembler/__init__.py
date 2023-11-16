@@ -1,2 +1,2 @@
-from ._assembler import Assembler
-from .lexer import lexer
+from .assembler import Assembler
+from .lexer import Lexer

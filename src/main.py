@@ -1,9 +1,14 @@
-from Assembler import Assembler
+from Assembler import Assembler, lexer
 
 def main():
     asm = Assembler()
-    asm.read_file()
-    asm.write_file()
+    asm.assemble("source.txt")
+
+
+
+
+
+
 
 
 
