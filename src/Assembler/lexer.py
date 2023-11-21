@@ -301,15 +301,13 @@ class Lexer:
         """
 
 
-        with open(file_path, 'rb') as file:
-            # read the source file remove all comments.
-            with open(file_path, "r") as file:
-                contents = file.read()
+        # read the source file remove all comments.
+        with open(file_path, "r") as file:
+            contents = file.read()
 
+            print(contents)
 
+            token_sequence = self.analyze_string(contents)
 
-
-                token_sequence = self.analyze_string(contents)
-
-                if token_sequence is not None:
-                    return token_sequence
+            if token_sequence is not None:
+                return token_sequence
