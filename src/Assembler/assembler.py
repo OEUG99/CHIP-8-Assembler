@@ -10,16 +10,7 @@ class Assembler:
     def assemble(self, file_name):
         token_sequence_list = self.lexer.analyze_file(file_name)
 
-        AST = self.parser.parse_sequences(token_sequence_list)
 
+
+        AST = self.parser.parse_sequence(token_sequence_list)
         print(AST)
-
-
-
-
-
-
-
-
-
-

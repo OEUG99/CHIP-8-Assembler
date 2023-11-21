@@ -1,9 +1,7 @@
-LINE:
-.sprite #FF #FF #FF
-
-MAIN:
-LD I $LINE
-LD V0 #0
-LD V1 #15
-DRW V0 V1 #3
-JP $MAIN
+IF (V1 == V2) {
+    V8 = V9;
+    v10 = v11;
+    IF (v3 = v5) {
+    v5 = v6;
+    }
+}

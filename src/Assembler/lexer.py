@@ -21,7 +21,6 @@ class Token:
         return f"Token({repr(self.type)}, {repr(self.value)})"
 
 
-
 class TokenSequence:
 
     def __init__(self, obj=None):
@@ -42,6 +41,9 @@ class TokenSequence:
     def pop(self, __index=-1):
         return self.tokens.pop(__index)
 
+    def peek(self, __index=0):
+        return self.tokens[__index]
+
     def __len__(self):
         return len(self.tokens)
 
@@ -51,16 +53,10 @@ class TokenSequence:
     def __next__(self):
         result = self.dequeue()
 
-        if len(self.tokens) == 0:
-            raise Exception()
-
         return result
 
     def __iter__(self):
         return self
-
-
-
 
 
 opcode_Mnemonic = {
@@ -118,20 +114,36 @@ operators = {
         "AND",
         "OR",
         "NOT",
-    }
+    },
+    "bitwise": {
+        "&",
+        "|",
+        "^",
+        "~",
+        "<<",
+        ">>",
+    },
+    "scope": {
+        "(",
+        ")",
+        "{",
+        "}",
+    },
 }
 
 kewords = {
     "IF",
-    "ELSE",
     "WHILE",
+    "FOR",
+    "ELSE",
 }
 
 
 class Lexer:
 
     def __init__(self):
-        pass
+        # Used to process scoping.
+        self.process_queue = []
 
     @staticmethod
     def analyze_string(string: str) -> Union[TokenSequence, None]:
@@ -145,7 +157,7 @@ class Lexer:
 
         token_sequence = TokenSequence()
 
-        lexemes = re.findall(r"([a-zA-Z0-9_:&]+|[+\-*/=><\(\)\n;])", string)
+        lexemes = re.findall(r"(==|!=|<=|>=|[a-zA-Z0-9_:&]+|[+\-*/=><\(\)\[\]\}\{\n;])", string)
 
         for lexeme in lexemes:
 
@@ -154,13 +166,36 @@ class Lexer:
                 token_sequence.enqueue(Token("EOL", lexeme))
                 continue
 
+            if lexeme in operators["relational"]:
+                token_sequence.enqueue(Token("relational_operator", lexeme))
+                continue
+
+            if lexeme in operators["scope"]:
+                if lexeme == "(":
+                    token_sequence.enqueue(Token("LPAREN", lexeme))
+                    continue
+                elif lexeme == ")":
+                    token_sequence.enqueue(Token("RPAREN", lexeme))
+                    continue
+                elif lexeme == "{":
+                    token_sequence.enqueue(Token("LBRACE", lexeme))
+                    continue
+                elif lexeme == "}":
+                    token_sequence.enqueue(Token("RBRACE", lexeme))
+                    continue
+
+            # Determine if lexeme is a keyword
+            if lexeme in kewords:
+                token_sequence.enqueue(Token("keyword", lexeme))
+                continue
+
             # Determine if lexeme is a math operator
             if lexeme in operators["arithmetic"]:
                 token_sequence.enqueue(Token("arithmetic_operator", lexeme))
                 continue
 
             # Determine if lexeme is an assignment operator:
-            elif lexeme in operators["assignment"]:
+            if lexeme in operators["assignment"]:
                 token_sequence.enqueue(Token("assignment_operator", lexeme))
                 continue
 
@@ -265,18 +300,16 @@ class Lexer:
         :rtype:
         """
 
-        result = []
 
         with open(file_path, 'rb') as file:
             # read the source file remove all comments.
             with open(file_path, "r") as file:
                 contents = file.read()
 
-                lines = contents.splitlines()
 
-                for line in lines:
-                    token_sequence = self.analyze_string(line)
-                    if token_sequence is not None:
-                        result.append(token_sequence)
 
-            return result
+
+                token_sequence = self.analyze_string(contents)
+
+                if token_sequence is not None:
+                    return token_sequence
