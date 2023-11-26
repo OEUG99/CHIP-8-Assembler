@@ -112,6 +112,16 @@ class IfStatementNode(Node):
         return f"if({self.condition}, then {self.true_statement} else {self.false_statement})"
 
 
+class WhileStatementNode(Node):
+
+    def __init__(self, condition, true_statement):
+        super().__init__()
+        self.condition = condition
+        self.true_statement = true_statement
+
+    def __repr__(self):
+        return f"while({self.condition}, then {self.true_statement})"
+
 class MultiLineNode(Node):
 
     def __init__(self, expression_list):
@@ -192,7 +202,11 @@ class Parser:
 
             if self.current_token_is("keyword", "IF"):
                 self.scope_level -= 1
-                node_list.append(self.if_statement())
+                node_list.append(self.conditional_statement("IF"))
+
+            elif self.current_token_is("keyword", "WHILE"):
+                self.scope_level -=1
+                node_list.append(self.conditional_statement("WHILE"))
             else:
                 node_list.append(self.expression())
                 if self.current_token_is("EOL"):  # Check if the ';' token is reached.
@@ -201,8 +215,8 @@ class Parser:
         self.next_token()
         return MultiLineNode(node_list)
 
-    def if_statement(self):
-        assert self.current_token_is("keyword", "IF")  # Make sure we are at the start of an if statement.
+    def conditional_statement(self, keyword):
+
 
         # First we consume the if keyword.
         self.eat("keyword")
@@ -222,20 +236,27 @@ class Parser:
 
         # we are now at the end of the multiline expression, so we eat the } symbol.
 
-        # We now check for the false statement (else statement).
-        if self.current_token_is("keyword", ("ELSE",)):
-            self.next_token()
-            self.eat("LBRACE")
-            self.scope_level += 1
-            false_statement = self.multiline_expressions()
-            self.scope_level -= 1
-            self.eat("RBRACE")
-            node = IfStatementNode(condition=condition, true_statement=true_statement, false_statement=false_statement)
+        if keyword == "IF":
+
+            # We now check for the false statement (else statement).
+            if self.current_token_is("keyword", ("ELSE",)):
+                self.next_token()
+                self.eat("LBRACE")
+                self.scope_level += 1
+                false_statement = self.multiline_expressions()
+                self.scope_level -= 1
+                self.eat("RBRACE")
+                node = IfStatementNode(condition=condition, true_statement=true_statement, false_statement=false_statement)
+                return node
+
+            # if there is no else statement, we just return the if statement node.
+            node = IfStatementNode(condition=condition, true_statement=true_statement)
+            return node
+        elif keyword == "WHILE":
+            # if there is no else statement, we just return the if statement node.
+            node = WhileStatementNode(condition=condition, true_statement=true_statement)
             return node
 
-        # if there is no else statement, we just return the if statement node.
-        node = IfStatementNode(condition=condition, true_statement=true_statement)
-        return node
 
     def expression(self):
 
@@ -271,7 +292,7 @@ class Parser:
             return node
 
         if self.current_token_is("keyword", ("IF",)):
-            return self.if_statement()
+            return self.conditional_statement("IF")
 
         if self.current_token_is("assignment_operator", ("=",)):
 
