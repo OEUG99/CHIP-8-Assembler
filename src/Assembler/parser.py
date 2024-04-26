@@ -142,13 +142,38 @@ class Parser:
     def parse_expression(self):
         token = self.current_token
 
+        # Lets make the assumption that their may be more than 1 expression.
+        # For most cases, there will only be 1 expression; however, for relational operators we compare two expressions.
+        # EG: V1 + V2 == V2 + V6 <--- two expressions being compared.
+        left_expression = None
+        combined_expression = None
+
         if token.type in ['number', 'register']:
             next_token = self.token_list.peek()
+
             if next_token.type == "arithmetic_operator" and next_token.value in (
                     "+", "-"):  # + or - because * / are terms
-                return self.parse_arithmetic_expressions()
+                left_expression = self.parse_arithmetic_expressions()
+            if next_token.type == "assignment_operator":
+                left_expression = self.parse_assignment_expressions()
+
+            # For cases where there is no expression, and just a term.
+            if next_token.type in ("EOL", "EOF"):
+                return self.parse_term()
+
         elif token.type == "LPAREN":
-            return self.parse_term()
+            left_expression = self.parse_term()
+
+        # Now we can check and process operators that use more than 1 expression.
+        if self.current_token.type != "EOL":
+            if self.current_token.type == "relational_operator":
+                # We will pass in the left expression into the operator function.
+                combined_expression = self.parse_relational_operator(left_expression)
+
+        if combined_expression is not None:
+            return combined_expression
+        else:
+            return left_expression
 
     def parse_arithmetic_expressions(self):
         node_left = self.parse_term()
@@ -178,12 +203,10 @@ class Parser:
 
         return node_left
 
-
     def parse_if_expressions(self):
         self.eat("keyword")
         condition = self.parse_expression()
         pass
-
 
     def parse_scope_block_expression(self):
         self.eat('LBRACE')
@@ -205,17 +228,20 @@ class Parser:
 
         return expressions
 
-    def parse_relational_operator(self):
-        node_left = self.parse_term()
+    def parse_relational_operator(self, left_expression):
+        # In the relational function, we will parse the second expression, so we can then compare the two
+        # and return it as the final expression.
+
 
         while self.current_token.value in ['>', '<', '<=', '>=', "==", "!="]:
             operator_node = Node(value=self.current_token.value)
             self.eat(self.current_token.type)
 
-            node_right = self.parse_expression()
+            right_expression = self.parse_expression()  # The right term.
+            print(right_expression, "HERE!")
 
-            operator_node.append(node_left)
-            operator_node.append(node_right)
+            operator_node.append(left_expression)
+            operator_node.append(right_expression)
 
             # Append the operator node to the current head node if it's not the root node
             if self.head != self.tree:
@@ -225,17 +251,24 @@ class Parser:
                 self.head = operator_node
                 self.tree = operator_node
 
-            node_left = operator_node
+            left_expression = operator_node
 
         else:
-            return node_left  # Return the operator node
+            return left_expression  # Return the operator node
 
     def parse_assignment_expressions(self):
-        node_left = self.parse_term()
+
+        # First we check if the current token is a register, as this is the register we will be assigning values to.
+        if self.current_token.type != "register":
+            raise Exception("Invalid user of assignment operator. Only 1 term (register) can be on the left side.")
+
+        node_left = self.parse_term()  # We can use term because we know there is only 1 term on the left side, aka
+        # the register.
 
         while self.current_token.type == "assignment_operator":
             self.eat("assignment_operator")
-            node_right = self.parse_expression()
+            node_right = self.parse_expression()  # We use expression because we can't assume number of terms.
+            print(node_right)
 
             # Create a sub-tree for the operation.
             operator_node = Node(value="=")
