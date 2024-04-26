@@ -47,6 +47,12 @@ class TokenSequence:
     def __len__(self):
         return len(self.tokens)
 
+    def is_empty(self):
+        if len(self.tokens) >= 0:
+            return False
+        else:
+            return True
+
     def __repr__(self):
         return f"TokenSequence({repr(self.tokens)})"
 
@@ -289,6 +295,7 @@ class Lexer:
         if len(token_sequence) == 0:
             return None
 
+
         return token_sequence
 
     def analyze_file(self, file_path: str):
@@ -305,9 +312,10 @@ class Lexer:
         with open(file_path, "r") as file:
             contents = file.read()
 
-            print(contents)
+            #print(contents)
 
             token_sequence = self.analyze_string(contents)
 
-            if token_sequence is not None:
-                return token_sequence
+            token_sequence.enqueue(Token("EOF", "EOF"))
+
+            return token_sequence

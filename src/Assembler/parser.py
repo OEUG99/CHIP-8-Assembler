@@ -4,333 +4,254 @@ class Node:
         self.children = []
         self.value = value
 
+    def append(self, node):
+        self.children.append(node)
+
     def __repr__(self):
         return f"Node({repr(self.children)})"
 
-
-class NumberNode(Node):
-
-    def __init__(self, value):
-        super().__init__()
-        self.value = value
-
-    def __repr__(self):
-        return f"{self.value}"
+    def print_tree(self, depth=0):
+        print(f"{depth}  " * depth, end="| ")
+        print(f"{self.value}")
+        for child in self.children:
+            child.print_tree(depth + 1)
 
 
-class RegisterNode(Node):
-
-    def __init__(self, value):
-        super().__init__()
-        self.value = value
-
-    def __repr__(self):
-        return f"{self.value}"
+class ArithmeticNode(Node):
+    def __init__(self, operator):
+        super().__init__(value=operator)
 
 
-class BinaryOperationNode(Node):
-
-    def __init__(self, left_node, operation, right_node):
-        super().__init__()
-        self.left_node = left_node
-        self.operation = operation
-        self.right_node = right_node
-
-    def __repr__(self):
-        return f"({self.left_node} {self.operation} {self.right_node})"
-
-
-class EOLNode(Node):
-
-    def __init__(self, value):
-        super().__init__()
-        self.value = value
-
-    def __repr__(self):
-        return f"{self.value}"
-
-
-class MnemonicNode(Node):
-
-    def __init__(self, mnemonic):
-        super().__init__()
-        self.mnemonic = mnemonic
-
-    def __repr__(self):
-        return f"{self.mnemonic}"
-
-
-class InstructionNode(Node):
-
-    def __init__(self, mnemonic_node, first_operand=None, second_operand=None, third_operand=None):
-        super().__init__()
-
-        self.mnemonic_node = mnemonic_node
-        self.first_operand = first_operand
-        self.second_operand = second_operand
-        self.third_operand = third_operand
-
-    def __repr__(self):
-        operand_string = f"{self.first_operand}, {self.second_operand}, {self.third_operand}"
-
-        return f"{self.mnemonic_node}({operand_string})"
-
-
-class AssignmentOperationNode(Node):
-
-    def __init__(self, variable, operation, value_node):
-        super().__init__()
-        self.variable = variable
-        self.operation = operation
-        self.value_mode = value_node
-
-    def __repr__(self):
-        return f"({self.variable} {self.operation} {self.value_mode})"
+class AssignmentNode(Node):
+    def __init__(self, operator):
+        super().__init__(value="=")
 
 
 class RelationalNode(Node):
-
-    def __init__(self, left_node, operation, right_node):
-        super().__init__()
-        self.left_node = left_node
-        self.operation = operation
-        self.right_node = right_node
-
-    def __repr__(self):
-        return f"({self.left_node} {self.operation} {self.right_node})"
+    def __init__(self, operator):
+        super().__init__(value="=")
 
 
-class IfStatementNode(Node):
+class Scope:
+    def __init__(self):
+        self.variables = {}
 
-    def __init__(self, condition, true_statement, false_statement=None):
-        super().__init__()
-        self.condition = condition
-        self.true_statement = true_statement
-        self.false_statement = false_statement
+    def add_variable(self, variable):
+        self.variables[variable.name] = variable
 
-    def __repr__(self):
-        return f"if({self.condition}, then {self.true_statement} else {self.false_statement})"
-
-
-class WhileStatementNode(Node):
-
-    def __init__(self, condition, true_statement):
-        super().__init__()
-        self.condition = condition
-        self.true_statement = true_statement
-
-    def __repr__(self):
-        return f"while({self.condition}, then {self.true_statement})"
-
-class MultiLineNode(Node):
-
-    def __init__(self, expression_list):
-        super().__init__()
-        self.expression_list = expression_list
-
-    def __repr__(self):
-        return f"ml({', '.join([repr(i) for i in self.expression_list])})"
+    def get_variable(self, name):
+        return self.variables.get(name)
 
 
 class Parser:
 
-    def __init__(self):
-        self.current_token = None
-        self.token_sequences = None
-        self.tokens = None
-        self.scope_level = 0
+    def __init__(self, token_list):
+        self.token_list = token_list
+        self.current_token = self.token_list.dequeue()
+        self.tree = Node(value="dumby")
+        self.head = self.tree
+        self.context_stack = []
+        self.scopes = [Scope()]  # Initialize with global scope
 
-    def parse_sequence(self, token_sequence):
-        self.current_token_sequence = token_sequence
-        self.tokens = iter(token_sequence)
-        self.next_token()  # grab the first token.
-        return self.expression()
+    def push_context(self, context):
+        self.context_stack.append(context)
 
-    def parse_sequences(self, token_sequences):
-        """
-        Similar to parse_sequence(), but for multiple token sequences.
+    def pop_context(self):
+        return self.context_stack.pop()
 
-        :param token_sequences:
-        :type token_sequences:
-        :return:
-        :rtype:
-        """
+    def current_context(self):
+        if self.context_stack:
+            return self.context_stack[-1]
+        else:
+            return None
 
-        previous_node = Node()  # Create a head node to hold the abstract syntax tree.
+    def enter_scope(self):
+        self.scopes.append(Scope())
 
-        AST = previous_node  # We set the head node as the abstract syntax tree, to traverse it later.
+    def current_scope(self):
+        return self.scopes[-1]
 
-        for token_sequence in token_sequences:
-            previous_node = AST  # Set the previous node to the head node.
-            new_node = self.parse_sequence(token_sequence)
-            previous_node.children.append(new_node)
-
-        return AST
-
-    def next_token(self):
-        try:
-            self.current_token = next(self.tokens)  # Advance to next token
-        except Exception:  # If Token Sequence ends...
-            self.current_token = None  # No more tokens
-
-    def current_token_is(self, type, value=None):
-        if self.current_token is None:
-            return False
-        if self.current_token.type != type:
-            return False
-        if value is not None and self.current_token.value not in value:
-            return False
-
-        return True
+    def exit_scope(self):
+        return self.scopes.pop()
 
     def eat(self, token_type):
 
-        if self.current_token is None:
-            return False
-
         if self.current_token.type == token_type:
-            self.next_token()
+            self.current_token = self.token_list.dequeue()
         else:
-            raise Exception(f"Invalid Syntax: Expected {token_type}, got {self.current_token.type}")
+            raise SyntaxError('Invalid syntax')
 
-    def multiline_expressions(self):
-        node_list = []
+    def parse_lines(self):
+        while not self.token_list.is_empty():
+            self.head = self.tree
+            expression = self.parse_expression()
 
-        self.eat("LBRACE")
+            # Check for end of line delimiter
+            if self.current_token.type == 'EOL':
+                self.eat('EOL')
+            elif self.current_token.type == 'EOF':
+                self.eat('EOF')
+                return self.tree
 
-        while not self.current_token_is("RBRACE") and self.scope_level > 0:
-
-            if self.current_token_is("keyword", "IF"):
-                self.scope_level -= 1
-                node_list.append(self.conditional_statement("IF"))
-
-            elif self.current_token_is("keyword", "WHILE"):
-                self.scope_level -=1
-                node_list.append(self.conditional_statement("WHILE"))
             else:
-                node_list.append(self.expression())
-                if self.current_token_is("EOL"):  # Check if the ';' token is reached.
-                    self.eat("EOL")  # Consume the ';' token.
+                raise SyntaxError(
+                    f'Expected semicolon at the end of expression -- {self.current_token.type, self.current_token.value}')
 
-        self.next_token()
-        return MultiLineNode(node_list)
+            # You can do something with the parsed expression, such as adding it to a list
+            # or processing it further
+            print("Parsed expression:", expression)
 
-    def conditional_statement(self, keyword):
+    def parse_term(self):
+        node_left = self.parse_factor()
 
+        while self.current_token.type == "arithmetic_operator" and self.current_token.value in ("*", "/"):
+            operator_token = self.current_token
+            self.eat(operator_token.type)
+            node_right = self.parse_factor()
 
-        # First we consume the if keyword.
-        self.eat("keyword")
+            # Create term node with operator and left/right nodes
+            term_node = Node(value=operator_token.value)
+            term_node.children.append(node_left)
+            term_node.children.append(node_right)
 
-        # Now we must parse the condition.
-        self.next_token()  # advance to the next token, which is the start of the condition.
-        condition = self.expression()  # now, the next token is a (, which is the start of an expression.
-        self.eat("RPAREN")  # we are now at the end of the condition, so we eat the ) symbol.
+            # Update left node for next iteration
+            node_left = term_node
 
+        return node_left
 
-        # now we must parse the multiline expression, which is the true statement.
-        # we are now at the start of the multiline expression, are within {}.
-        self.scope_level += 1
-        true_statement = self.multiline_expressions()
-        self.scope_level -= 1
-
-
-        # we are now at the end of the multiline expression, so we eat the } symbol.
-
-        if keyword == "IF":
-
-            # We now check for the false statement (else statement).
-            if self.current_token_is("keyword", ("ELSE",)):
-                self.next_token()
-                self.eat("LBRACE")
-                self.scope_level += 1
-                false_statement = self.multiline_expressions()
-                self.scope_level -= 1
-                self.eat("RBRACE")
-                node = IfStatementNode(condition=condition, true_statement=true_statement, false_statement=false_statement)
-                return node
-
-            # if there is no else statement, we just return the if statement node.
-            node = IfStatementNode(condition=condition, true_statement=true_statement)
-            return node
-        elif keyword == "WHILE":
-            # if there is no else statement, we just return the if statement node.
-            node = WhileStatementNode(condition=condition, true_statement=true_statement)
-            return node
-
-
-    def expression(self):
-
-        node = self.term()
-
-
-        if self.current_token_is("mnemonic"):
-            if self.current_token is not "DRW":
-                mnemonic = self.current_token.value
-                self.next_token()
-
-                node = InstructionNode(mnemonic_node=MnemonicNode(mnemonic),
-                                       first_operand=self.factor(),
-                                       second_operand=self.factor())
-            else:
-                mnemonic = self.current_token.value
-                self.next_token()
-
-                node = InstructionNode(mnemonic_node=MnemonicNode(mnemonic),
-                                       first_operand=self.factor(),
-                                       second_operand=self.factor(),
-                                       third_operand=self.factor())
-
-        if self.current_token_is("arithmetic_operator", ("+", "-")):
-            operation = self.current_token.value
-            self.next_token()
-            node = BinaryOperationNode(left_node=node, operation=operation, right_node=self.term())
-
-        if self.current_token_is("relational_operator"):
-            operation = self.current_token.value
-            self.next_token()
-            node = RelationalNode(left_node=node, operation=operation, right_node=self.term())
-            return node
-
-        if self.current_token_is("keyword", ("IF",)):
-            return self.conditional_statement("IF")
-
-        if self.current_token_is("assignment_operator", ("=",)):
-
-            operation = self.current_token.value
-            self.next_token()
-            return AssignmentOperationNode(variable=node, operation=operation, value_node=self.expression())
-
-        return node
-
-    def term(self):
-        node = self.factor()
-
-        while self.current_token_is("arithmetic_operator", ("*", "/")):
-            operation = self.current_token.value
-            self.next_token()
-            node = BinaryOperationNode(left_node=node, operation=operation, right_node=self.factor())
-
-        return node
-
-    def factor(self):
+    def parse_factor(self):
         token = self.current_token
-
-        print(token, self.scope_level)
-
-        if token.type == "number":
-            self.eat("number")
-            return NumberNode(value=token.value)
-        elif token.type == "register":
+        if token.type == 'register':
             self.eat("register")
-            return RegisterNode(value=token.value)
-        elif token.type == "LPAREN":  # If token is an opening parenthesis
+            # Create and return a node for the register value
+            return Node(value=token.value)  # Assuming token.value holds the register value
+        elif token.type == "number":
+            self.eat("number")
+            return Node(value=token.value)
+        elif token.type == "EOF":
+            self.eat("EOF")
+            return Node(value=token.value)
+        elif token.type == "LPAREN":
             self.eat("LPAREN")
-            node = self.expression()
+            node = self.parse_expression()
             self.eat("RPAREN")
             return node
-        elif token.type == "LBRACE":
-            self.eat("LBRACE")
-            node = self.multiline_expressions()
-            self.eat("RBRACE")
-            return node
+        else:
+            raise SyntaxError('Invalid syntax')
 
+    def parse_expression(self):
+        token = self.current_token
+
+        if token.type in ['number', 'register']:
+            next_token = self.token_list.peek()
+            if next_token.type == "arithmetic_operator" and next_token.value in (
+                    "+", "-"):  # + or - because * / are terms
+                return self.parse_arithmetic_expressions()
+        elif token.type == "LPAREN":
+            return self.parse_term()
+
+    def parse_arithmetic_expressions(self):
+        node_left = self.parse_term()
+
+        while self.current_token.type == "arithmetic_operator":
+
+            operator_token = self.current_token
+            self.eat("arithmetic_operator")
+            node_right = self.parse_term()
+
+            # Create a sub-tree for the operation.
+            operator_node = ArithmeticNode(operator=operator_token)
+            operator_node.children.append(node_left)
+            operator_node.children.append(node_right)
+
+            # Append sub-tree to the current head node if it's not the root node.
+            if self.head != self.tree:
+                self.head.children.append(operator_node)
+            else:
+                # If it's the root node, update the head to the operator node.
+                self.head = operator_node
+                self.tree = operator_node
+
+            # For cases when there are multple arthmetic operation in one line
+            # we need to set left to the previous operator.
+            node_left = operator_node
+
+        return node_left
+
+
+    def parse_if_expressions(self):
+        self.eat("keyword")
+        condition = self.parse_expression()
+        pass
+
+
+    def parse_scope_block_expression(self):
+        self.eat('LBRACE')
+        self.enter_scope()  # Enter a new scope
+
+        # Parse expressions within the scope block
+        expressions = []
+        while self.current_token.type != '}':  # looping through all expressions until we meet close scope.
+            expression = self.parse_expression()
+            expressions.append(expression)
+
+        self.eat('}')  # Consume the '}' token
+        exited_scope = self.exit_scope()  # Exit the current scope
+
+        # Handle variable declarations within the scope block
+        # Note: this might not be needed since we only have registers to work with.
+        for var in exited_scope.variables.values():
+            self.current_scope().add_variable(var)
+
+        return expressions
+
+    def parse_relational_operator(self):
+        node_left = self.parse_term()
+
+        while self.current_token.value in ['>', '<', '<=', '>=', "==", "!="]:
+            operator_node = Node(value=self.current_token.value)
+            self.eat(self.current_token.type)
+
+            node_right = self.parse_expression()
+
+            operator_node.append(node_left)
+            operator_node.append(node_right)
+
+            # Append the operator node to the current head node if it's not the root node
+            if self.head != self.tree:
+                self.head.children.append(operator_node)
+            else:
+                # If it's the root node, update the head to the operator node
+                self.head = operator_node
+                self.tree = operator_node
+
+            node_left = operator_node
+
+        else:
+            return node_left  # Return the operator node
+
+    def parse_assignment_expressions(self):
+        node_left = self.parse_term()
+
+        while self.current_token.type == "assignment_operator":
+            self.eat("assignment_operator")
+            node_right = self.parse_expression()
+
+            # Create a sub-tree for the operation.
+            operator_node = Node(value="=")
+            operator_node.children.append(node_left)
+            operator_node.children.append(node_right)
+
+            # Append sub-tree to the current head node if it's not the root node.
+            if self.head != self.tree:
+                self.head.children.append(operator_node)
+            else:
+                # If it's the root node, update the head to the operator node.
+                self.head = operator_node
+                self.tree = operator_node
+
+            # For cases when there are multple arthmetic operation in one line
+            # we need to set left to the previous operator.
+            node_left = operator_node
+
+        return node_left

@@ -5,12 +5,22 @@ class Assembler:
 
     def __init__(self):
         self.lexer = Lexer()
-        self.parser = Parser()
 
     def assemble(self, file_name):
         token_sequence_list = self.lexer.analyze_file(file_name)
 
+        print("TOKEN_SEQUENCE_LIST:")
+        print(token_sequence_list)
+        print('\n')
 
 
-        AST = self.parser.parse_sequence(token_sequence_list)
-        print(AST)
+        parser = Parser(token_sequence_list)
+        nodes = parser.parse_expression()
+        nodes.print_tree()
+
+
+
+
+
+
+
