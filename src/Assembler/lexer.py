@@ -48,10 +48,10 @@ class TokenSequence:
         return len(self.tokens)
 
     def is_empty(self):
-        if len(self.tokens) >= 0:
-            return False
-        else:
+        if len(self.tokens) == 0:
             return True
+        else:
+            return False
 
     def __repr__(self):
         return f"TokenSequence({repr(self.tokens)})"
@@ -316,6 +316,9 @@ class Lexer:
 
             token_sequence = self.analyze_string(contents)
 
-            token_sequence.enqueue(Token("EOF", "EOF"))
+            try:
+                token_sequence.enqueue(Token("EOF", "EOF"))
+            except AttributeError:
+                raise Exception("The source code file does not contain any characters.")
 
             return token_sequence

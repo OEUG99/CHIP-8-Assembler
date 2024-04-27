@@ -82,24 +82,20 @@ class Parser:
             raise SyntaxError('Invalid syntax')
 
     def parse_lines(self):
-        while not self.token_list.is_empty():
-            self.head = self.tree
-            expression = self.parse_expression()
+        """
+        This is where we will take each individual expression after parsing it, and adding it to the tree.
+        :return:
+        """
 
-            # Check for end of line delimiter
-            if self.current_token.type == 'EOL':
-                self.eat('EOL')
-            elif self.current_token.type == 'EOF':
-                self.eat('EOF')
-                return self.tree
+        while self.current_token:
+            node = self.parse_expression()  # results are stores in the internal parser tree, self.tree
 
-            else:
-                raise SyntaxError(
-                    f'Expected semicolon at the end of expression -- {self.current_token.type, self.current_token.value}')
+            self.tree.append(node)
 
-            # You can do something with the parsed expression, such as adding it to a list
-            # or processing it further
-            print("Parsed expression:", expression)
+            if self.current_token.type == "EOF":
+                self.eat("EOF")
+
+        return self.tree
 
     def parse_term(self):
         node_left = self.parse_factor()
@@ -145,42 +141,48 @@ class Parser:
         # Lets make the assumption that their may be more than 1 expression.
         # For most cases, there will only be 1 expression; however, for relational operators we compare two expressions.
         # EG: V1 + V2 == V2 + V6 <--- two expressions being compared.
-        left_expression = None
+        expression = None
         combined_expression = None
+
+        # First we check if their is no token, this will be useful for when we shift the token_sequence later after
+        # processing a line of code.
+        if token is None:
+            return None
 
         if token.type in ['number', 'register']:
             next_token = self.token_list.peek()
 
-            if next_token.type == "arithmetic_operator" and next_token.value in (
-                    "+", "-"):  # + or - because * / are terms
-                left_expression = self.parse_arithmetic_expressions()
-            if next_token.type == "assignment_operator":
-                left_expression = self.parse_assignment_expressions()
 
-            # For cases where there is no expression, and just a term.
-            if next_token.type in ("EOL", "EOF"):
-                return self.parse_term()
+            if next_token.type == "assignment_operator":
+                expression = self.parse_assignment_expressions()
+
+            elif next_token.type == "relational_operator":
+                expression = self.parse_relational_operator(self.parse_term())
+            elif next_token.type == "arithmetic_operator" and next_token.value in (
+                    "+", "-"):  # + or - because * / are terms
+                expression = self.parse_arithmetic_expressions()
+            else:
+                # For when no operation is used.
+                expression = self.parse_term()
 
         elif token.type == "LPAREN":
-            left_expression = self.parse_term()
+            expression = self.parse_term()
 
-        # Now we can check and process operators that use more than 1 expression.
         if self.current_token.type != "EOL":
-            if self.current_token.type == "relational_operator":
-                # We will pass in the left expression into the operator function.
-                combined_expression = self.parse_relational_operator(left_expression)
-
-        if combined_expression is not None:
-            return combined_expression
+            if self.current_token.type == "EOF":
+                raise Exception("invalid syntax, forgot to end line of code with semicolon")
+            if expression.value == "+":
+                raise Exception("Invalid syntax - can start assignment operator with a arithmetic expression.", self.current_token.type)
+            else:
+                raise Exception("Invalid syntax - line of code must end with a semicolon", self.current_token.type)
         else:
-            return left_expression
+            return expression
 
     def parse_arithmetic_expressions(self):
         node_left = self.parse_term()
 
         while self.current_token.type == "arithmetic_operator":
-
-            operator_token = self.current_token
+            operator_token = self.current_token.value
             self.eat("arithmetic_operator")
             node_right = self.parse_term()
 
@@ -188,14 +190,6 @@ class Parser:
             operator_node = ArithmeticNode(operator=operator_token)
             operator_node.children.append(node_left)
             operator_node.children.append(node_right)
-
-            # Append sub-tree to the current head node if it's not the root node.
-            if self.head != self.tree:
-                self.head.children.append(operator_node)
-            else:
-                # If it's the root node, update the head to the operator node.
-                self.head = operator_node
-                self.tree = operator_node
 
             # For cases when there are multple arthmetic operation in one line
             # we need to set left to the previous operator.
@@ -232,29 +226,22 @@ class Parser:
         # In the relational function, we will parse the second expression, so we can then compare the two
         # and return it as the final expression.
 
-
         while self.current_token.value in ['>', '<', '<=', '>=', "==", "!="]:
             operator_node = Node(value=self.current_token.value)
             self.eat(self.current_token.type)
 
-            right_expression = self.parse_expression()  # The right term.
-            print(right_expression, "HERE!")
+            # Assignments can either be 1 term or multiple, so we must check.
+            if self.token_list.peek().type == "EOL":
+                right_expression = self.parse_factor()
+            else:
+                right_expression = self.parse_expression()  # We use expression because we can't assume number of terms.
 
             operator_node.append(left_expression)
             operator_node.append(right_expression)
 
-            # Append the operator node to the current head node if it's not the root node
-            if self.head != self.tree:
-                self.head.children.append(operator_node)
-            else:
-                # If it's the root node, update the head to the operator node
-                self.head = operator_node
-                self.tree = operator_node
-
             left_expression = operator_node
 
-        else:
-            return left_expression  # Return the operator node
+        return left_expression  # Return the operator node
 
     def parse_assignment_expressions(self):
 
@@ -262,29 +249,26 @@ class Parser:
         if self.current_token.type != "register":
             raise Exception("Invalid user of assignment operator. Only 1 term (register) can be on the left side.")
 
-        node_left = self.parse_term()  # We can use term because we know there is only 1 term on the left side, aka
+        left_term = self.parse_term()  # We can use term because we know there is only 1 term on the left side, aka
         # the register.
 
         while self.current_token.type == "assignment_operator":
             self.eat("assignment_operator")
-            node_right = self.parse_expression()  # We use expression because we can't assume number of terms.
-            print(node_right)
+
+
+            # Assignments can either be 1 term or multiple, so we must check.
+            if self.token_list.peek().type == "EOL":
+                right_expression = self.parse_factor()
+            else:
+                right_expression = self.parse_expression()  # We use expression because we can't assume number of terms.
 
             # Create a sub-tree for the operation.
             operator_node = Node(value="=")
-            operator_node.children.append(node_left)
-            operator_node.children.append(node_right)
-
-            # Append sub-tree to the current head node if it's not the root node.
-            if self.head != self.tree:
-                self.head.children.append(operator_node)
-            else:
-                # If it's the root node, update the head to the operator node.
-                self.head = operator_node
-                self.tree = operator_node
+            operator_node.children.append(left_term)
+            operator_node.children.append(right_expression)
 
             # For cases when there are multple arthmetic operation in one line
             # we need to set left to the previous operator.
-            node_left = operator_node
+            left_term = operator_node
 
-        return node_left
+        return left_term
