@@ -152,6 +152,7 @@ class Parser:
         if token.type in ['number', 'register']:
             next_token = self.token_list.peek()
 
+            # For relational expressions that are a single term long.
             if next_token.type == "relational_operator":
                 expression = self.parse_relational_operator(self.parse_term())
 
@@ -169,14 +170,17 @@ class Parser:
             expression = self.parse_term()
 
 
-
         if self.current_token.type != "EOL":
             if self.current_token.type == "assignment_operator":
                 if self.current_token.type != "EOL":
+                    # This error check is needed since stuff like "V1 + v2" is not a register you can assign too
                     if self.current_token.type == "assignment_operator":
                         if type(expression) is ArithmeticNode:
                             raise Exception("Can not assign to an arithmetic expression")
 
+            # For relational expressions that aren't a single term long.
+            elif self.current_token.type == "relational_operator":
+                expression = self.parse_relational_operator(expression)
 
         return expression
 
