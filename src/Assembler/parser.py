@@ -152,12 +152,12 @@ class Parser:
         if token.type in ['number', 'register']:
             next_token = self.token_list.peek()
 
+            if next_token.type == "relational_operator":
+                expression = self.parse_relational_operator(self.parse_term())
 
-            if next_token.type == "assignment_operator":
+            elif next_token.type == "assignment_operator":
                 expression = self.parse_assignment_expressions()
 
-            elif next_token.type == "relational_operator":
-                expression = self.parse_relational_operator(self.parse_term())
             elif next_token.type == "arithmetic_operator" and next_token.value in (
                     "+", "-"):  # + or - because * / are terms
                 expression = self.parse_arithmetic_expressions()
@@ -165,18 +165,20 @@ class Parser:
                 # For when no operation is used.
                 expression = self.parse_term()
 
-        elif token.type == "LPAREN":
+        if token.type == "LPAREN":
             expression = self.parse_term()
 
+
+
         if self.current_token.type != "EOL":
-            if self.current_token.type == "EOF":
-                raise Exception("invalid syntax, forgot to end line of code with semicolon")
-            if expression.value == "+":
-                raise Exception("Invalid syntax - can start assignment operator with a arithmetic expression.", self.current_token.type)
-            else:
-                raise Exception("Invalid syntax - line of code must end with a semicolon", self.current_token.type)
-        else:
-            return expression
+            if self.current_token.type == "assignment_operator":
+                if self.current_token.type != "EOL":
+                    if self.current_token.type == "assignment_operator":
+                        if type(expression) is ArithmeticNode:
+                            raise Exception("Can not assign to an arithmetic expression")
+
+
+        return expression
 
     def parse_arithmetic_expressions(self):
         node_left = self.parse_term()
@@ -254,7 +256,6 @@ class Parser:
 
         while self.current_token.type == "assignment_operator":
             self.eat("assignment_operator")
-
 
             # Assignments can either be 1 term or multiple, so we must check.
             if self.token_list.peek().type == "EOL":
