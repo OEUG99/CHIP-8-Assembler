@@ -4,4 +4,4 @@ a binary file that can be loaded into a CHIP-8 emulator. It is a two-pass assemb
 entire file and builds a symbol table, then it reads the file again and generates the binary file.
 
 ## Usage
-Coming soon...
+Run main.py and it turns assembly into machine code. (WIP)
